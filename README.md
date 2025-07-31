@@ -1,59 +1,40 @@
-# ClanWarMaker
+# CWL Manager - Clash of Clans CWL Management System
 
-Progetto con React , link al sito : https://clanwarmakerleague.onrender.com
+Sistema di gestione per Clan War League di Clash of Clans costruito con React e Express.
 
-Scopo del progetto :
+## Funzionalità
 
-Ricevere una o più liste suddvise per clan per la partecipazione alla cwl (clan war league)
-Far creare un messaggio , dove al suo interno trovo da 1 a più liste di utente urdinate in base ad un ordine inpartito da un admin .
+- **Registrazione Player**: Form per registrare i player con nome e livello Town Hall
+- **Pannello Admin**: Gestione clan, creazione messaggi CWL, esportazione PDF
+- **API Clash of Clans**: Integrazione per visualizzare statistiche player
+- **Interfaccia Italiana**: Completamente localizzata in italiano
 
-Il messaggio deve essere formato da : 
-- NomeClan + numeroPartecipanti + nomeLega ( dati inseriti dall'admin)
-    - esempio : Eclipse 15 partecipanti 
-- lista ordinata dei partecipanti alla cwl,
-    - esempio : "1)Baddy th17"
-- ritorna alla fine di ogni lista il numero di partecipanti che mancano per qulla lista di quel clan 
-    - esempio :  " mancano ancora 3 player "
+## Deployment su Render
 
+1. Connetti questo repository a Render
+2. Usa le seguenti impostazioni:
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+   - **Environment**: Node.js
+   - **Plan**: Free
 
-Esempio di una lista :
+## Struttura Progetto
 
-GB CHAMP 3
+- `client/` - Frontend React con Vite
+- `server/` - Backend Express.js 
+- `shared/` - Schemi TypeScript condivisi
+- `render.yaml` - Configurazione Render
 
-Trimurti 
-Raoul
-Xale 02
-Kando
-Alien 
-Alien 2
-Baddy
-David 
-Rere 
-Psyco
-Inferno
-Massimiliano
-Maso 
-Stas 
-Ivan 
-Ichigo
+## API Esterne
 
-Suddivisione Pagine :
+Per utilizzare l'integrazione Clash of Clans, impostare la variabile d'ambiente:
+- `CLASH_API_KEY` o `COC_API_KEY` - API key di Clash of Clans
 
-Pagina player :
-I nomi dei partecipanti dovranno essere inseriti a mano in una oagina da ogni player , un input per il nome ed una select che va da "th1" a "th17" ed 
-un bottone invio che salva i dati inseriti dall'utente .
-La stringa formata dai dati inseriti dall'utente verrà salvata su un file listaIscrizioni.txt. 
+## Local Development
 
-Pagina Admin ( accessibile solo a certi utenti ):
-In questa pagina verrà visualizzato un menu nel quale l'admin può inserire i dettagli del messaggio , esempio il numero di clan , il loro nomeLega ed i partecipanti ed in fine
-un bottone dove stampa la lista/messaggio in un file pdf .
-Potrà anche vedere in una tabella i dettagli di tutti i player presenti in un clan da lui inserito ( utilizza un'API di clash of clans ) , potrà vdere ad esmepio , nome , tag ,
-livello th , stelle war , coppe attuali , massimo coppe raggiunte e trofei leggenda .
-Botttone che svuota il file listaIscrizioni.txt.
+```bash
+npm install
+npm run dev
+```
 
-Pagina menu principale :
-
-Pagina iniziale dove verrà mostrato un menu principale, formato da :
-- Descrizione del clan 
-- Bottone che porta alla pagina Admin
-- Bottone che porta alla pagina player
+L'applicazione sarà disponibile su `http://localhost:5000`

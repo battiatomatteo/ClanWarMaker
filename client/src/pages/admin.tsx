@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, FileText, Download, Trash2, RefreshCw, Users, PlusCircle } from "lucide-react";
+import { Settings, FileText, Download, Trash2, RefreshCw, Users, PlusCircle, ArrowLeftRight, ArrowUp, ArrowDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { ClashPlayer, PlayerRegistration } from "@shared/schema";
 
@@ -19,10 +19,17 @@ interface ClanForm {
   league: string;
 }
 
+interface ClanWithPlayers extends ClanForm {
+  id: string;
+  players: PlayerRegistration[];
+}
+
 export default function AdminPage() {
   const [clans, setClans] = useState<ClanForm[]>([]);
+  const [clansWithPlayers, setClansWithPlayers] = useState<ClanWithPlayers[]>([]);
   const [generatedMessage, setGeneratedMessage] = useState("");
   const [selectedClanTag, setSelectedClanTag] = useState("");
+  const [showPlayerManager, setShowPlayerManager] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -39,10 +46,17 @@ export default function AdminPage() {
     queryKey: ["/api/player-registrations"],
   });
 
+  // Fetch file status
+  const { data: fileStatus } = useQuery({
+    queryKey: ["/api/registrations-file"],
+    refetchInterval: 5000, // Aggiorna ogni 5 secondi
+  });
+
   // Fetch clash players
-  const { data: clashPlayers = [], isLoading: isLoadingPlayers, refetch: refetchPlayers } = useQuery<ClashPlayer[]>({
+  const { data: clashPlayers = [], isLoading: isLoadingPlayers, error: clashError, refetch: refetchPlayers } = useQuery<ClashPlayer[]>({
     queryKey: ["/api/clash-players", selectedClanTag],
     enabled: !!selectedClanTag,
+    retry: false,
   });
 
   // Clear registrations mutation
@@ -127,8 +141,83 @@ export default function AdminPage() {
     setClans(clans.filter((_, i) => i !== index));
   };
 
-  const handleGenerateMessage = () => {
+  // Gestione player tra liste
+  const assignPlayersToClans = () => {
     if (clans.length === 0) {
+      toast({
+        title: "Errore",
+        description: "Aggiungi almeno un clan prima di assegnare i player",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newClansWithPlayers: ClanWithPlayers[] = clans.map((clan, index) => ({
+      ...clan,
+      id: `clan-${index}`,
+      players: []
+    }));
+
+    // Distribuisci i player registrati tra i clan
+    registrations.forEach((player, index) => {
+      const clanIndex = index % clans.length;
+      newClansWithPlayers[clanIndex].players.push(player);
+    });
+
+    setClansWithPlayers(newClansWithPlayers);
+    setShowPlayerManager(true);
+  };
+
+  const movePlayer = (playerId: string, fromClanId: string, toClanId: string) => {
+    setClansWithPlayers(prev => {
+      const updated = [...prev];
+      const fromClan = updated.find(c => c.id === fromClanId);
+      const toClan = updated.find(c => c.id === toClanId);
+      
+      if (fromClan && toClan) {
+        const playerIndex = fromClan.players.findIndex(p => p.id === playerId);
+        if (playerIndex !== -1) {
+          const player = fromClan.players.splice(playerIndex, 1)[0];
+          toClan.players.push(player);
+        }
+      }
+      
+      return updated;
+    });
+  };
+
+  const movePlayerUp = (clanId: string, playerIndex: number) => {
+    if (playerIndex === 0) return;
+    
+    setClansWithPlayers(prev => {
+      const updated = [...prev];
+      const clan = updated.find(c => c.id === clanId);
+      if (clan) {
+        const players = [...clan.players];
+        [players[playerIndex], players[playerIndex - 1]] = [players[playerIndex - 1], players[playerIndex]];
+        clan.players = players;
+      }
+      return updated;
+    });
+  };
+
+  const movePlayerDown = (clanId: string, playerIndex: number) => {
+    setClansWithPlayers(prev => {
+      const updated = [...prev];
+      const clan = updated.find(c => c.id === clanId);
+      if (clan && playerIndex < clan.players.length - 1) {
+        const players = [...clan.players];
+        [players[playerIndex], players[playerIndex + 1]] = [players[playerIndex + 1], players[playerIndex]];
+        clan.players = players;
+      }
+      return updated;
+    });
+  };
+
+  const handleGenerateMessage = () => {
+    const dataToUse = showPlayerManager && clansWithPlayers.length > 0 ? clansWithPlayers : clans;
+    
+    if (dataToUse.length === 0) {
       toast({
         title: "Errore",
         description: "Aggiungi almeno un clan prima di generare il messaggio",
@@ -136,7 +225,38 @@ export default function AdminPage() {
       });
       return;
     }
-    generateMessageMutation.mutate(clans);
+    
+    if (showPlayerManager) {
+      generateMessageFromAssignedPlayers();
+    } else {
+      generateMessageMutation.mutate(clans);
+    }
+  };
+
+  const generateMessageFromAssignedPlayers = () => {
+    let message = "";
+    
+    clansWithPlayers.forEach((clan) => {
+      message += `${clan.league}\n\n`;
+      message += `${clan.name} ${clan.participants} partecipanti\n\n`;
+      
+      clan.players.forEach((player, index) => {
+        message += `${index + 1}) ${player.playerName} ${player.thLevel}\n`;
+      });
+      
+      const missingPlayers = Math.max(0, clan.participants - clan.players.length);
+      if (missingPlayers > 0) {
+        message += `\nMancano ancora ${missingPlayers} player\n`;
+      }
+      
+      message += "\n---\n\n";
+    });
+    
+    setGeneratedMessage(message);
+    toast({
+      title: "Messaggio generato",
+      description: "Il messaggio CWL è stato generato con successo",
+    });
   };
 
   const handleExportPdf = () => {
@@ -178,11 +298,11 @@ export default function AdminPage() {
               <Button
                 variant="outline"
                 onClick={handleClearRegistrations}
-                disabled={clearRegistrationsMutation.isPending}
+                disabled={clearRegistrationsMutation.isPending || registrations.length === 0}
                 className="bg-warning text-white hover:bg-yellow-600"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Svuota Registrazioni
+                {clearRegistrationsMutation.isPending ? "Cancellando..." : "Svuota Registrazioni"}
               </Button>
               <Button
                 onClick={handleExportPdf}
@@ -288,14 +408,26 @@ export default function AdminPage() {
                 </div>
               )}
 
-              <Button 
-                onClick={handleGenerateMessage}
-                disabled={generateMessageMutation.isPending}
-                className="w-full"
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Genera Messaggio
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  onClick={assignPlayersToClans}
+                  disabled={clans.length === 0 || registrations.length === 0}
+                  className="w-full"
+                  variant="outline"
+                >
+                  <ArrowLeftRight className="mr-2 h-4 w-4" />
+                  Gestisci Player tra Clan
+                </Button>
+                
+                <Button 
+                  onClick={handleGenerateMessage}
+                  disabled={generateMessageMutation.isPending}
+                  className="w-full"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Genera Messaggio
+                </Button>
+              </div>
             </div>
 
             {/* Preview Section */}
@@ -316,6 +448,108 @@ export default function AdminPage() {
         </CardContent>
       </Card>
 
+      {/* Player Management Section */}
+      {showPlayerManager && clansWithPlayers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <ArrowLeftRight className="mr-2 h-5 w-5" />
+                Gestione Player tra Clan
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowPlayerManager(false)}
+              >
+                Chiudi
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {clansWithPlayers.map((clan) => (
+                <Card key={clan.id} className="border-2">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">
+                      {clan.name} - {clan.league}
+                    </CardTitle>
+                    <p className="text-sm text-gray-600">
+                      {clan.players.length}/{clan.participants} player
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {clan.players.map((player, index) => (
+                        <div key={player.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-sm">{index + 1}.</span>
+                            <div>
+                              <div className="font-medium">{player.playerName}</div>
+                              <div className="text-xs text-gray-600">{player.thLevel}</div>
+                            </div>
+                          </div>
+                          <div className="flex space-x-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => movePlayerUp(clan.id, index)}
+                              disabled={index === 0}
+                              className="p-1 h-6 w-6"
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => movePlayerDown(clan.id, index)}
+                              disabled={index === clan.players.length - 1}
+                              className="p-1 h-6 w-6"
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                            <Select
+                              onValueChange={(toClanId) => movePlayer(player.id, clan.id, toClanId)}
+                            >
+                              <SelectTrigger className="h-6 w-16 text-xs">
+                                <SelectValue placeholder="→" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clansWithPlayers
+                                  .filter(c => c.id !== clan.id)
+                                  .map(targetClan => (
+                                    <SelectItem key={targetClan.id} value={targetClan.id}>
+                                      {targetClan.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ))}
+                      {clan.players.length === 0 && (
+                        <div className="text-center text-gray-500 py-4 text-sm">
+                          Nessun player assegnato
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            <div className="mt-6 text-center">
+              <Button
+                onClick={handleGenerateMessage}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Genera Messaggio con Liste Personalizzate
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Player Statistics Table */}
       <Card>
         <CardHeader>
@@ -325,26 +559,51 @@ export default function AdminPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex justify-between items-center">
-            <div className="flex space-x-4">
-              <Input
-                placeholder="Inserisci tag clan (es. ABCD1234)"
-                value={selectedClanTag}
-                onChange={(e) => setSelectedClanTag(e.target.value)}
-                className="w-64"
-              />
-              <Button
-                onClick={() => refetchPlayers()}
-                disabled={isLoadingPlayers}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Aggiorna Dati
-              </Button>
+          <div className="mb-4 space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="flex space-x-4">
+                <Input
+                  placeholder="Inserisci tag clan (es. #ABCD1234 o ABCD1234)"
+                  value={selectedClanTag}
+                  onChange={(e) => setSelectedClanTag(e.target.value.toUpperCase())}
+                  className="w-64"
+                />
+                <Button
+                  onClick={() => refetchPlayers()}
+                  disabled={isLoadingPlayers || !selectedClanTag}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {isLoadingPlayers ? "Caricamento..." : "Cerca Clan"}
+                </Button>
+              </div>
+              <div className="text-sm text-gray-600">
+                {clashPlayers.length} player trovati
+              </div>
             </div>
-            <div className="text-sm text-gray-600">
-              {clashPlayers.length} player trovati
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <h5 className="font-medium text-blue-800 mb-2">Come trovare il tag del clan:</h5>
+              <ol className="text-sm text-blue-700 space-y-1">
+                <li>1. Apri Clash of Clans</li>
+                <li>2. Vai alla pagina del tuo clan</li>
+                <li>3. Il tag è sotto il nome del clan (es. #ABCD1234)</li>
+                <li>4. Copia e incolla qui (con o senza #)</li>
+              </ol>
             </div>
           </div>
+
+          {/* Error message for API */}
+          {clashError && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <h5 className="font-medium text-red-800 mb-2">Errore nella ricerca clan:</h5>
+              <p className="text-sm text-red-700">
+                {clashError instanceof Error ? clashError.message : "Errore sconosciuto"}
+              </p>
+              <p className="text-xs text-red-600 mt-2">
+                Verifica che il tag clan sia corretto e che l'API key sia configurata correttamente.
+              </p>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <Table>
@@ -394,14 +653,35 @@ export default function AdminPage() {
           </div>
 
           {/* Registrations Summary */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <h5 className="font-semibold text-blue-800">Registrazioni Attuali</h5>
-                <p className="text-blue-600 text-sm">{registrations.length} player registrati</p>
+          <div className="mt-6 grid md:grid-cols-2 gap-4">
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h5 className="font-semibold text-blue-800">Registrazioni Attuali</h5>
+                  <p className="text-blue-600 text-sm">{registrations.length} player registrati</p>
+                  <p className="text-xs text-blue-500 mt-1">
+                    💾 Dati salvati automaticamente in file persistente
+                  </p>
+                </div>
+                <div className="text-sm text-blue-600">
+                  <div>Ultimo aggiornamento: {new Date().toLocaleString()}</div>
+                  <div className="text-xs mt-1">
+                    File: data/registrazioni.json
+                  </div>
+                </div>
               </div>
-              <div className="text-sm text-blue-600">
-                Ultimo aggiornamento: {new Date().toLocaleString()}
+            </div>
+            
+            <div className="p-4 bg-green-50 rounded-lg">
+              <h5 className="font-semibold text-green-800">Stato Persistenza</h5>
+              <div className="text-sm text-green-700">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${fileStatus?.isEmpty === false ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                  <span>File dati: {fileStatus?.isEmpty === false ? 'Contiene dati' : 'Vuoto'}</span>
+                </div>
+                <div className="text-xs mt-2 text-green-600">
+                  I dati vengono salvati automaticamente ad ogni registrazione e ripristinati al riavvio del server.
+                </div>
               </div>
             </div>
           </div>

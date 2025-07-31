@@ -102,8 +102,24 @@ The application uses three main tables:
 
 **Shared Schema Approach**: Using Zod schemas in the `/shared` directory ensures type safety and validation consistency between frontend and backend.
 
-**Memory + File Storage**: Hybrid storage approach allows for development without database setup while providing persistence, with easy migration to full PostgreSQL in production.
+**Memory + File Storage**: Hybrid storage approach with automatic JSON persistence. Registrations are saved to `data/registrazioni.json` and restored on server restart, eliminating data loss while maintaining development simplicity.
 
 **Component-First UI**: Shadcn/ui provides a comprehensive, customizable component system that maintains consistency while allowing for easy theming and modifications.
 
 **Query-Based State Management**: TanStack Query eliminates the need for complex client-side state management by focusing on server state synchronization and caching.
+
+## Recent Changes: Latest modifications with dates
+
+### 31 Luglio 2025 - Sistema Persistenza Dati
+- ✅ **Persistenza automatica**: Dati registrazioni salvati in file JSON (data/registrazioni.json)
+- ✅ **Ripristino al riavvio**: Registrazioni vengono caricate automaticamente all'avvio del server
+- ✅ **Indicatori stato file**: Interfaccia admin mostra stato persistenza in tempo reale
+- ✅ **Cancellazione controllata**: Pulsante admin svuota sia memoria che file persistente
+- ✅ **Logging migliorato**: Console mostra operazioni di salvataggio e caricamento dati
+
+### 30 Luglio 2025 - Miglioramenti Admin Panel
+- ✅ **Sistema gestione player tra clan**: Aggiunta sezione per scambiare player tra liste prima del PDF
+- ✅ **Miglioramento API Clash of Clans**: Aggiunta gestione errori dettagliata e debugging
+- ✅ **Interfaccia ricerca clan migliorata**: Istruzioni chiare per trovare il tag clan
+- ✅ **Funzionalità drag & drop**: Player possono essere spostati tra clan e riordinati
+- ✅ **Configurazione API key**: Integrata gestione chiave API Clash of Clans

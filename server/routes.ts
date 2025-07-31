@@ -39,6 +39,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get registrations file content
+  app.get("/api/registrations-file", async (req, res) => {
+    try {
+      const content = await storage.readFromFile('registrazioni.json');
+      res.json({ content: content || '[]', isEmpty: !content || content.trim() === '[]' });
+    } catch (error) {
+      res.json({ content: '[]', isEmpty: true });
+    }
+  });
+
   // Clan endpoints
   app.get("/api/clans", async (req, res) => {
     try {
@@ -126,22 +136,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clanTag } = req.params;
       const apiKey = process.env.CLASH_API_KEY || process.env.COC_API_KEY || "";
       
+      console.log('Clan tag richiesto:', clanTag);
+      console.log('API Key presente:', !!apiKey);
+      
       if (!apiKey) {
-        return res.status(500).json({ message: "API Key di Clash of Clans non configurata" });
+        return res.status(500).json({ 
+          message: "API Key di Clash of Clans non configurata",
+          details: "Configura CLASH_API_KEY nelle variabili d'ambiente"
+        });
       }
       
-      const response = await fetch(`https://api.clashofclans.com/v1/clans/%23${clanTag.replace('#', '')}/members`, {
+      // Pulisci e formatta il tag clan
+      const cleanTag = clanTag.replace(/[^A-Z0-9]/g, '').toUpperCase();
+      const apiUrl = `https://api.clashofclans.com/v1/clans/%23${cleanTag}/members`;
+      
+      console.log('URL API:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Accept': 'application/json'
         }
       });
       
+      console.log('Risposta API status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Errore API Response:', errorText);
+        
+        if (response.status === 404) {
+          return res.status(404).json({ 
+            message: "Clan non trovato", 
+            details: `Il tag clan "${clanTag}" non esiste o non è valido`
+          });
+        }
+        
+        if (response.status === 403) {
+          return res.status(403).json({ 
+            message: "API Key non valida o non autorizzata",
+            details: "Verifica che la tua API Key sia corretta e autorizzata per questo IP"
+          });
+        }
+        
+        throw new Error(`API Error: ${response.status} - ${errorText}`);
       }
       
       const data = await response.json();
+      console.log('Dati ricevuti:', data.items?.length || 0, 'membri');
+      
+      if (!data.items || !Array.isArray(data.items)) {
+        return res.status(500).json({ 
+          message: "Formato dati API non valido",
+          details: "La risposta dell'API non contiene la lista dei membri"
+        });
+      }
+      
       const players: ClashPlayer[] = data.items.map((member: any) => ({
         name: member.name,
         tag: member.tag,
@@ -154,8 +204,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(players);
     } catch (error) {
-      console.error('Clash API Error:', error);
-      res.status(500).json({ message: "Errore nel recupero dei dati da Clash of Clans API" });
+      console.error('Clash API Error completo:', error);
+      res.status(500).json({ 
+        message: "Errore nel recupero dei dati da Clash of Clans API",
+        details: error instanceof Error ? error.message : "Errore sconosciuto"
+      });
     }
   });
 

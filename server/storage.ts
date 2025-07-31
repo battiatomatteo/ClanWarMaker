@@ -27,13 +27,16 @@ export class MemStorage implements IStorage {
   private clans: Map<string, Clan>;
   private cwlMessages: Map<string, CwlMessage>;
   private dataDir: string;
+  private registrationsFile: string;
 
   constructor() {
     this.playerRegistrations = new Map();
     this.clans = new Map();
     this.cwlMessages = new Map();
     this.dataDir = path.join(process.cwd(), 'data');
+    this.registrationsFile = path.join(this.dataDir, 'registrazioni.json');
     this.ensureDataDir();
+    this.loadRegistrationsFromFile();
   }
 
   private async ensureDataDir(): Promise<void> {
@@ -41,6 +44,33 @@ export class MemStorage implements IStorage {
       await fs.mkdir(this.dataDir, { recursive: true });
     } catch (error) {
       // Directory might already exist
+    }
+  }
+
+  private async loadRegistrationsFromFile(): Promise<void> {
+    try {
+      const data = await fs.readFile(this.registrationsFile, 'utf-8');
+      const registrations: PlayerRegistration[] = JSON.parse(data);
+      
+      this.playerRegistrations.clear();
+      registrations.forEach(registration => {
+        this.playerRegistrations.set(registration.id, registration);
+      });
+      
+      console.log(`Caricate ${registrations.length} registrazioni dal file`);
+    } catch (error) {
+      // File non esiste o è vuoto, inizia con dati vuoti
+      console.log('Nessun file di registrazioni trovato, inizializzo storage vuoto');
+    }
+  }
+
+  private async saveRegistrationsToFile(): Promise<void> {
+    try {
+      const registrations = Array.from(this.playerRegistrations.values());
+      await fs.writeFile(this.registrationsFile, JSON.stringify(registrations, null, 2), 'utf-8');
+      console.log(`Salvate ${registrations.length} registrazioni nel file`);
+    } catch (error) {
+      console.error('Errore nel salvare le registrazioni:', error);
     }
   }
 
@@ -57,7 +87,10 @@ export class MemStorage implements IStorage {
     };
     this.playerRegistrations.set(id, registration);
     
-    // Also save to file
+    // Salva nel file JSON persistente
+    await this.saveRegistrationsToFile();
+    
+    // Salva anche nel file di testo per compatibilità
     const fileContent = `${registration.playerName} ${registration.thLevel}\n`;
     await this.appendToFile('listaIscrizioni.txt', fileContent);
     
@@ -66,6 +99,11 @@ export class MemStorage implements IStorage {
 
   async clearPlayerRegistrations(): Promise<void> {
     this.playerRegistrations.clear();
+    
+    // Cancella il file JSON persistente
+    await this.saveRegistrationsToFile();
+    
+    // Cancella anche il file di testo
     await this.clearFile('listaIscrizioni.txt');
   }
 
