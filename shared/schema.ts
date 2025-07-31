@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -47,35 +47,6 @@ export type Clan = typeof clans.$inferSelect;
 
 export type InsertCwlMessage = z.infer<typeof insertCwlMessageSchema>;
 export type CwlMessage = typeof cwlMessages.$inferSelect;
-
-// Clan Info for Home Page
-export const clanInfo = pgTable("clan_info", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  description: text("description").notNull(),
-  tag: text("tag"), // Optional clan tag
-  league: text("league"),
-  activeMembers: text("active_members"),
-  winRate: text("win_rate"),
-  requirements: text("requirements"),
-  nextCwlInfo: text("next_cwl_info"),
-  isActive: boolean("is_active").default(false), // Only one can be active
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertClanInfoSchema = createInsertSchema(clanInfo).pick({
-  name: true,
-  description: true,
-  tag: true,
-  league: true,
-  activeMembers: true,
-  winRate: true,
-  requirements: true,
-  nextCwlInfo: true,
-});
-
-export type InsertClanInfo = z.infer<typeof insertClanInfoSchema>;
-export type ClanInfo = typeof clanInfo.$inferSelect;
 
 export type ClashPlayer = {
   name: string;
