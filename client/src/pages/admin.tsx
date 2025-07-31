@@ -4,12 +4,13 @@ import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, FileText, Download, Trash2, RefreshCw, Users, PlusCircle, ArrowLeftRight, ArrowUp, ArrowDown } from "lucide-react";
+import { Settings, FileText, Download, Trash2, RefreshCw, Users, PlusCircle, ArrowLeftRight, ArrowUp, ArrowDown, Edit, Eye, Star } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { ClashPlayer, PlayerRegistration } from "@shared/schema";
 
@@ -22,6 +23,19 @@ interface ClanForm {
 interface ClanWithPlayers extends ClanForm {
   id: string;
   players: PlayerRegistration[];
+}
+
+interface ClanHomeInfo {
+  id: string;
+  name: string;
+  description: string;
+  tag?: string;
+  league?: string;
+  activeMembers?: string;
+  winRate?: string;
+  requirements?: string;
+  nextCwlInfo?: string;
+  isActive: boolean;
 }
 
 export default function AdminPage() {
@@ -47,7 +61,7 @@ export default function AdminPage() {
   });
 
   // Fetch file status
-  const { data: fileStatus } = useQuery({
+  const { data: fileStatus } = useQuery<{content: string, isEmpty: boolean}>({
     queryKey: ["/api/registrations-file"],
     refetchInterval: 5000, // Aggiorna ogni 5 secondi
   });
@@ -586,9 +600,21 @@ export default function AdminPage() {
               <ol className="text-sm text-blue-700 space-y-1">
                 <li>1. Apri Clash of Clans</li>
                 <li>2. Vai alla pagina del tuo clan</li>
-                <li>3. Il tag è sotto il nome del clan (es. #ABCD1234)</li>
+                <li>3. Il tag è sotto il nome del clan (es. #2YG9CLCCV)</li>
                 <li>4. Copia e incolla qui (con o senza #)</li>
               </ol>
+              <div className="mt-2 pt-2 border-t border-blue-200">
+                <p className="text-xs text-blue-600 font-medium">💡 Su Render:</p>
+                <p className="text-xs text-blue-600">
+                  <a 
+                    href="/api/server-info" 
+                    target="_blank" 
+                    className="underline hover:text-blue-800"
+                  >
+                    Clicca qui per vedere l'IP del server
+                  </a> e aggiungerlo alla tua API key
+                </p>
+              </div>
             </div>
           </div>
 
@@ -597,11 +623,27 @@ export default function AdminPage() {
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
               <h5 className="font-medium text-red-800 mb-2">Errore nella ricerca clan:</h5>
               <p className="text-sm text-red-700">
-                {clashError instanceof Error ? clashError.message : "Errore sconosciuto"}
+                {(() => {
+                  if (clashError instanceof Error) {
+                    if (clashError.message.includes('403') || clashError.message.includes('non autorizzata')) {
+                      return "API Key non autorizzata per questo IP";
+                    }
+                    if (clashError.message.includes('404') || clashError.message.includes('non trovato')) {
+                      return "Clan non trovato. Verifica che il tag sia corretto.";
+                    }
+                    if (clashError.message.includes('JSON') || clashError.message.includes('token')) {
+                      return "Errore di comunicazione con l'API. Riprova tra qualche momento.";
+                    }
+                    return clashError.message;
+                  }
+                  return "Errore sconosciuto";
+                })()}
               </p>
-              <p className="text-xs text-red-600 mt-2">
-                Verifica che il tag clan sia corretto e che l'API key sia configurata correttamente.
-              </p>
+              <div className="text-xs text-red-600 mt-2 space-y-1">
+                <p>• Verifica che il tag clan sia corretto (es. #2YG9CLCCV)</p>
+                <p>• Su Render: aggiungi l'IP del server alla tua API key su https://developer.clashofclans.com</p>
+                <p>• Controlla che CLASH_API_KEY sia configurata nelle variabili ambiente</p>
+              </div>
             </div>
           )}
 
@@ -683,6 +725,218 @@ export default function AdminPage() {
                   I dati vengono salvati automaticamente ad ogni registrazione e ripristinati al riavvio del server.
                 </div>
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sezione Visualizzazione Registrazioni */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Eye className="mr-2 h-5 w-5" />
+            Player Registrati ({registrations.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {registrations.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Users className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+              <p>Nessun player registrato al momento</p>
+              <p className="text-sm mt-2">I player si registreranno usando il modulo sulla homepage</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Nome Player</TableHead>
+                    <TableHead>Town Hall</TableHead>
+                    <TableHead>Data Registrazione</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {registrations.map((reg, index) => (
+                    <TableRow key={reg.id}>
+                      <TableCell className="font-medium">{index + 1}</TableCell>
+                      <TableCell className="font-medium">{reg.playerName}</TableCell>
+                      <TableCell>
+                        <Badge className={getTHBadgeColor(parseInt(reg.thLevel.replace('TH', '')))}>
+                          {reg.thLevel}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {reg.registeredAt ? new Date(reg.registeredAt).toLocaleDateString('it-IT') : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          
+          {/* Status File Persistence */}
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h5 className="font-medium text-blue-800">Stato Persistenza File</h5>
+                <p className="text-sm text-blue-700">
+                  {fileStatus?.isEmpty ? 
+                    "File vuoto - Le registrazioni verranno salvate automaticamente" : 
+                    `File contiene ${registrations.length} registrazioni salvate`
+                  }
+                </p>
+              </div>
+              <div className={`w-3 h-3 rounded-full ${fileStatus?.isEmpty ? 'bg-gray-400' : 'bg-green-500'}`} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sezione Gestione Informazioni Clan Homepage */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Star className="mr-2 h-5 w-5" />
+              Gestione Informazioni Clan Homepage
+            </div>
+            <Button
+              onClick={() => {
+                setIsEditingClanInfo(true);
+                setEditingClanId(null);
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Aggiungi Clan
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <h5 className="font-medium text-yellow-800 mb-2">Informazioni per Homepage</h5>
+              <p className="text-sm text-yellow-700">
+                Qui puoi gestire le informazioni dei clan che appariranno sulla homepage. 
+                Sostituisci le informazioni di Eclipse con quelle del tuo clan.
+              </p>
+            </div>
+
+            {/* Form per aggiungere/modificare clan info */}
+            {isEditingClanInfo && (
+              <Card className="border-2 border-blue-200">
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    {editingClanId ? 'Modifica Informazioni Clan' : 'Aggiungi Nuovo Clan'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-4 space-y-0">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Nome Clan *</label>
+                        <Input placeholder="Eclipse" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Tag Clan</label>
+                        <Input placeholder="#2YG9CLCCV" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Lega</label>
+                        <Input placeholder="Master League I" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Membri Attivi</label>
+                        <Input placeholder="35/50" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Win Rate</label>
+                        <Input placeholder="85%" />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Descrizione Clan *</label>
+                        <Textarea 
+                          placeholder="Descrizione del clan..."
+                          className="min-h-24"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Requisiti</label>
+                        <Textarea 
+                          placeholder="TH12+ per CWL, donazioni equilibrate..."
+                          className="min-h-20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Prossima CWL</label>
+                        <Input placeholder="1-8 Febbraio 2025" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex space-x-3 mt-6">
+                    <Button className="bg-green-600 hover:bg-green-700">
+                      <Edit className="mr-2 h-4 w-4" />
+                      {editingClanId ? 'Salva Modifiche' : 'Aggiungi Clan'}
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditingClanInfo(false);
+                        setEditingClanId(null);
+                      }}
+                    >
+                      Annulla
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Lista clan configurati (simulata per ora) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-green-50 border-green-200">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-green-500 rounded-full" title="Attivo sulla homepage" />
+                    <div>
+                      <h4 className="font-medium">Eclipse</h4>
+                      <p className="text-sm text-gray-600">#2YG9CLCCV - Master League I</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Clan competitivo con focus su CWL e war continue...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditingClanInfo(true);
+                      setEditingClanId('eclipse-default');
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-green-600 border-green-600"
+                  >
+                    <Star className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center text-gray-500 py-4">
+              <p className="text-sm">
+                💡 Solo un clan può essere attivo sulla homepage alla volta
+              </p>
             </div>
           </div>
         </CardContent>
