@@ -565,7 +565,7 @@ export default function AdminPage() {
                 <Input
                   placeholder="Inserisci tag clan (es. #ABCD1234 o ABCD1234)"
                   value={selectedClanTag}
-                  onChange={(e) => setSelectedClanTag(e.target.value.toUpperCase())}
+                  onChange={(e) => setSelectedClanTag(e.target.value.trim().toUpperCase())}
                   className="w-64"
                 />
                 <Button
