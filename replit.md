@@ -110,12 +110,14 @@ The application uses three main tables:
 
 ## Recent Changes: Latest modifications with dates
 
-### 31 Luglio 2025 - Sistema Persistenza Dati
+### 31 Luglio 2025 - Sistema Persistenza Dati e Miglioramenti API
 - ✅ **Persistenza automatica**: Dati registrazioni salvati in file JSON (data/registrazioni.json)
 - ✅ **Ripristino al riavvio**: Registrazioni vengono caricate automaticamente all'avvio del server
 - ✅ **Indicatori stato file**: Interfaccia admin mostra stato persistenza in tempo reale
 - ✅ **Cancellazione controllata**: Pulsante admin svuota sia memoria che file persistente
 - ✅ **Logging migliorato**: Console mostra operazioni di salvataggio e caricamento dati
+- ✅ **Gestione errori API migliorata**: Messaggi di errore specifici per problemi API key/IP
+- ✅ **Endpoint server-info**: Nuovo endpoint per identificare IP server per configurazione API key
 
 ### 30 Luglio 2025 - Miglioramenti Admin Panel
 - ✅ **Sistema gestione player tra clan**: Aggiunta sezione per scambiare player tra liste prima del PDF

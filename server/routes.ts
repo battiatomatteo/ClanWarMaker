@@ -49,6 +49,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint per ottenere IP del server (utile per configurare API Clash)
+  app.get("/api/server-info", async (req, res) => {
+    const serverInfo = {
+      ip: req.ip,
+      forwardedFor: req.headers['x-forwarded-for'],
+      realIp: req.headers['x-real-ip'],
+      host: req.headers.host,
+      userAgent: req.headers['user-agent']
+    };
+    res.json(serverInfo);
+  });
+
   // Clan endpoints
   app.get("/api/clans", async (req, res) => {
     try {
@@ -134,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/clash-players/:clanTag", async (req, res) => {
     try {
       const { clanTag } = req.params;
-      const apiKey = process.env.CLASH_API_KEY || process.env.COC_API_KEY || "";
+      const apiKey = process.env.CLASH_API_KEY_2 || process.env.CLASH_API_KEY || process.env.COC_API_KEY || "";
       
       console.log('Clan tag richiesto:', clanTag);
       console.log('API Key presente:', !!apiKey);
