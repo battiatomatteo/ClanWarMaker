@@ -158,6 +158,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Accept': 'application/json'
         }
       });
+
+      // Debug rapido: stampa la risposta come testo
+      const debugText = await response.text();
+      console.log('Risposta API (debug):', debugText);
+
+      // Per continuare a usare la risposta come JSON, puoi fare:
+      let data;
+      try {
+        data = JSON.parse(debugText);
+      } catch (e) {
+        return res.status(500).json({ 
+          message: "Risposta non valida dall'API Clash of Clans",
+          details: debugText
+        });
+      }
       
       console.log('Risposta API status:', response.status);
       
