@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error(`API Error: ${response.status} - ${errorText}`);
       }
       
-      const data = await response.json();
+      data = await response.json();
       console.log('Dati ricevuti:', data.items?.length || 0, 'membri');
       
       if (!data.items || !Array.isArray(data.items)) {
