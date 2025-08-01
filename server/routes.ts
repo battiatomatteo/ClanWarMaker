@@ -130,11 +130,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clash-players/", (req, res) => {
+    return res.status(400).json({
+      message: "Tag clan mancante",
+      details: "Devi specificare un tag clan nell'URL"
+    });
+  });
+  
   // Clash of Clans API integration
   app.get("/api/clash-players/:clanTag", async (req, res) => {
     try {
       const { clanTag } = req.params;
-      const apiKey = process.env.CLASH_API_KEY || process.env.COC_API_KEY || "";
+      if (!clanTag || clanTag.trim() === "") {
+        return res.status(400).json({
+          message: "Tag clan mancante",
+          details: "Devi specificare un tag clan nell'URL"
+        });
+      }
+            const apiKey = process.env.CLASH_API_KEY || process.env.COC_API_KEY || "";
       
       console.log('Clan tag richiesto:', clanTag);
       console.log('API Key presente:', !!apiKey);
